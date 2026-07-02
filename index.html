@@ -1,0 +1,883 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Three Couplings of Two Fair Dice — an optimal-transport playground</title>
+<meta name="description" content="Same fair-die marginals, three very different joint laws. Roll the dice under the independent, comonotone, and antithetic couplings and watch the optimal-transport cost change." />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+<style>
+  :root{
+    --paper:#FBF9F4;
+    --ink:#15171F;
+    --ink-soft:#5A5E6B;
+    --ink-faint:#9A9DA8;
+    --line:rgba(21,23,31,.10);
+    --line-soft:rgba(21,23,31,.055);
+    --card:#FFFFFF;
+    --grid:rgba(21,23,31,.045);
+
+    /* coupling identities */
+    --c-independent:#4F6D8C;
+    --c-comonotone:#1F9E6B;
+    --c-antithetic:#D85A3C;
+
+    /* set per selection */
+    --accent:var(--c-independent);
+    --accent-ink:#33485e;
+
+    --good:#1F9E6B;
+    --bad:#D85A3C;
+    --neutral:#4F6D8C;
+
+    --r:14px;
+    --r-sm:9px;
+    --shadow:0 1px 2px rgba(21,23,31,.05), 0 8px 26px -18px rgba(21,23,31,.30);
+    --mono:"IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+    --disp:"Space Grotesk", system-ui, sans-serif;
+    --body:"Inter", system-ui, -apple-system, sans-serif;
+  }
+
+  *{box-sizing:border-box;}
+  html{-webkit-text-size-adjust:100%;}
+  body{
+    margin:0;
+    background:var(--paper);
+    background-image:
+      linear-gradient(var(--grid) 1px, transparent 1px),
+      linear-gradient(90deg, var(--grid) 1px, transparent 1px);
+    background-size:26px 26px;
+    color:var(--ink);
+    font-family:var(--body);
+    font-size:15px;
+    line-height:1.55;
+    -webkit-font-smoothing:antialiased;
+  }
+  .wrap{max-width:1140px;margin:0 auto;padding:clamp(18px,3.4vw,40px) clamp(16px,3.2vw,34px) 72px;}
+
+  /* ---------- header ---------- */
+  header.top{margin-bottom:26px;}
+  .eyebrow{
+    font-family:var(--mono);font-size:12px;letter-spacing:.16em;text-transform:uppercase;
+    color:var(--ink-soft);display:flex;align-items:center;gap:10px;margin-bottom:14px;
+  }
+  .eyebrow::before{content:"";width:26px;height:1px;background:var(--ink);opacity:.5;}
+  h1{
+    font-family:var(--disp);font-weight:700;
+    font-size:clamp(28px,5.2vw,52px);line-height:1.02;letter-spacing:-.022em;
+    margin:0 0 16px;max-width:18ch;
+  }
+  h1 em{font-style:normal;color:var(--accent);transition:color .35s ease;}
+  .lede{
+    font-size:clamp(15px,2.1vw,18px);color:var(--ink-soft);max-width:60ch;margin:0;
+  }
+  .lede b{color:var(--ink);font-weight:600;}
+
+  /* ---------- generic card ---------- */
+  .card{
+    background:var(--card);border:1px solid var(--line);border-radius:var(--r);
+    box-shadow:var(--shadow);min-width:0;
+  }
+  .card-h{
+    padding:15px 18px 0;display:flex;align-items:baseline;justify-content:space-between;gap:12px;flex-wrap:wrap;
+  }
+  .card-h h2{
+    font-family:var(--disp);font-weight:600;font-size:13px;letter-spacing:.04em;text-transform:uppercase;
+    margin:0;color:var(--ink);
+  }
+  .card-h .note{font-family:var(--mono);font-size:11.5px;color:var(--ink-faint);letter-spacing:.02em;}
+
+  /* ---------- selector ---------- */
+  .selector{margin:0 0 22px;}
+  .seg{
+    display:grid;grid-template-columns:repeat(3,1fr);gap:8px;
+    background:transparent;
+  }
+  .seg button{
+    text-align:left;cursor:pointer;font-family:inherit;color:var(--ink);
+    background:var(--card);border:1px solid var(--line);border-radius:var(--r);
+    padding:14px 15px 13px;display:flex;flex-direction:column;gap:5px;
+    transition:border-color .2s, box-shadow .2s, transform .08s;
+    position:relative;overflow:hidden;
+  }
+  .seg button::before{
+    content:"";position:absolute;left:0;top:0;bottom:0;width:3px;background:var(--tab-c);
+    opacity:.35;transition:opacity .2s, width .2s;
+  }
+  .seg button .tag{
+    font-family:var(--disp);font-weight:600;font-size:15px;letter-spacing:-.01em;display:flex;align-items:center;gap:8px;
+  }
+  .seg button .formula{font-family:var(--mono);font-size:12px;color:var(--ink-soft);}
+  .seg button .one-line{font-size:12.5px;color:var(--ink-soft);line-height:1.35;}
+  .seg button:hover{border-color:var(--tab-c);}
+  .seg button:focus-visible{outline:2.5px solid var(--tab-c);outline-offset:2px;}
+  .seg button[aria-selected="true"]{
+    border-color:var(--tab-c);
+    box-shadow:0 0 0 1px var(--tab-c), var(--shadow);
+  }
+  .seg button[aria-selected="true"]::before{opacity:1;width:5px;}
+  .seg button[aria-selected="true"] .tag{color:var(--tab-c);}
+  .dot{width:9px;height:9px;border-radius:50%;background:var(--tab-c);flex:none;}
+
+  /* ---------- main grid ---------- */
+  .stage{display:grid;grid-template-columns:minmax(0,0.92fr) minmax(0,1.08fr);gap:18px;align-items:start;}
+  @media (max-width:860px){ .stage{grid-template-columns:1fr;} }
+
+  /* ---------- dice + controls ---------- */
+  .roller{padding:18px;display:flex;flex-direction:column;gap:18px;}
+  .dice-scene{
+    display:flex;gap:clamp(20px,6vw,46px);justify-content:center;align-items:center;
+    padding:18px 8px 10px;min-height:170px;perspective:760px;
+  }
+  .die-col{display:flex;flex-direction:column;align-items:center;gap:9px;}
+  .die-label{font-family:var(--mono);font-size:12px;color:var(--ink-soft);letter-spacing:.06em;}
+  .die-label b{color:var(--ink);font-weight:600;}
+
+  .die{
+    --s:74px;width:var(--s);height:var(--s);position:relative;transform-style:preserve-3d;
+    transition:transform 1.05s cubic-bezier(.18,.74,.22,1.0);
+  }
+  .die.rolling{transition:transform 1.05s cubic-bezier(.34,.62,.2,1.0);}
+  .face{
+    position:absolute;inset:0;width:var(--s);height:var(--s);
+    background:linear-gradient(150deg,#ffffff,#eceae3);
+    border:1px solid rgba(21,23,31,.16);border-radius:14px;
+    display:grid;grid-template-columns:repeat(3,1fr);grid-template-rows:repeat(3,1fr);
+    padding:11px;gap:0;backface-visibility:hidden;
+    box-shadow:inset 0 0 0 1px rgba(255,255,255,.7), inset 0 -10px 18px -12px rgba(21,23,31,.25);
+  }
+  .pip{display:flex;align-items:center;justify-content:center;}
+  .pip span{
+    width:13px;height:13px;border-radius:50%;
+    background:radial-gradient(circle at 34% 30%, #4a4d57, var(--pip,#1b1d26) 72%);
+    box-shadow:inset 0 1px 1px rgba(255,255,255,.35), 0 1px 1px rgba(0,0,0,.18);
+  }
+  .die .face{ --pip:var(--accent-ink); }
+  .f-front {transform:translateZ(calc(var(--s)/2));}
+  .f-back  {transform:rotateY(180deg) translateZ(calc(var(--s)/2));}
+  .f-right {transform:rotateY(90deg)  translateZ(calc(var(--s)/2));}
+  .f-left  {transform:rotateY(-90deg) translateZ(calc(var(--s)/2));}
+  .f-top   {transform:rotateX(90deg)  translateZ(calc(var(--s)/2));}
+  .f-bottom{transform:rotateX(-90deg) translateZ(calc(var(--s)/2));}
+
+  .readout{
+    font-family:var(--mono);font-size:13px;text-align:center;color:var(--ink-soft);
+    min-height:20px;letter-spacing:.01em;
+  }
+  .readout b{color:var(--ink);}
+  .readout .chip{
+    display:inline-block;padding:1px 7px;border-radius:20px;font-size:11.5px;margin-left:4px;
+    border:1px solid var(--line);
+  }
+  .chip.yes{background:color-mix(in srgb,var(--accent) 14%,white);border-color:var(--accent);color:var(--accent-ink);}
+  .chip.no{background:#f4f3ef;color:var(--ink-faint);}
+
+  .controls{display:flex;gap:10px;flex-wrap:wrap;}
+  .btn{
+    font-family:var(--disp);font-weight:600;font-size:14px;letter-spacing:.01em;cursor:pointer;
+    border-radius:var(--r-sm);padding:12px 16px;border:1px solid transparent;transition:transform .08s, filter .15s, background .2s;
+    flex:1 1 auto;display:inline-flex;align-items:center;justify-content:center;gap:8px;white-space:nowrap;
+  }
+  .btn:active{transform:translateY(1px);}
+  .btn:focus-visible{outline:2.5px solid var(--accent);outline-offset:2px;}
+  .btn.primary{background:var(--accent);color:#fff;}
+  .btn.primary:hover{filter:brightness(1.06);}
+  .btn.ghost{background:var(--card);border-color:var(--line);color:var(--ink);}
+  .btn.ghost:hover{border-color:var(--accent);color:var(--accent-ink);}
+  .btn[disabled]{opacity:.5;cursor:progress;}
+
+  /* ---------- stat cards ---------- */
+  .stats{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;}
+  @media (max-width:520px){.stats{grid-template-columns:1fr;}}
+  .stat{
+    border:1px solid var(--line);border-radius:var(--r-sm);padding:12px 13px;background:#fcfbf8;
+  }
+  .stat .k{font-family:var(--mono);font-size:11px;color:var(--ink-soft);letter-spacing:.02em;display:block;margin-bottom:8px;min-height:28px;}
+  .stat .row{display:flex;align-items:baseline;justify-content:space-between;gap:8px;}
+  .stat .emp{font-family:var(--mono);font-weight:600;font-size:21px;color:var(--ink);line-height:1;}
+  .stat .emp.dim{color:var(--ink-faint);font-weight:500;}
+  .stat .exact{font-family:var(--mono);font-size:12px;color:var(--accent-ink);text-align:right;}
+  .stat .exact small{display:block;color:var(--ink-faint);font-size:10px;letter-spacing:.04em;text-transform:uppercase;}
+  .conv-bar{height:3px;border-radius:3px;background:var(--line-soft);margin-top:9px;overflow:hidden;}
+  .conv-bar i{display:block;height:100%;background:var(--accent);width:0;transition:width .4s ease;}
+
+  /* ---------- marginal-fairness toggle ---------- */
+  .marg-toggle-row{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-top:16px;}
+  .toggle{
+    display:inline-flex;align-items:center;gap:8px;cursor:pointer;
+    font-family:var(--mono);font-size:11.5px;letter-spacing:.02em;color:var(--ink);
+    background:none;border:1px solid var(--line);border-radius:999px;padding:6px 13px 6px 7px;
+    transition:border-color .2s, background .2s;
+  }
+  .toggle:hover{border-color:var(--accent);}
+  .toggle .sw{
+    width:28px;height:16px;border-radius:999px;background:var(--line);position:relative;
+    transition:background .2s;flex:none;
+  }
+  .toggle .sw::after{
+    content:"";position:absolute;top:2px;left:2px;width:12px;height:12px;border-radius:50%;
+    background:#fff;box-shadow:0 1px 2px rgba(0,0,0,.25);transition:transform .2s;
+  }
+  .toggle[aria-pressed="true"]{border-color:var(--accent);}
+  .toggle[aria-pressed="true"] .sw{background:var(--accent);}
+  .toggle[aria-pressed="true"] .sw::after{transform:translateX(12px);}
+  .marg-hint{font-family:var(--mono);font-size:10.5px;color:var(--ink-faint);}
+  .marginals{margin-top:14px;border-top:1px dashed var(--line);padding-top:13px;}
+  .marginals[hidden]{display:none;}
+  .marg-note{font-size:12.5px;line-height:1.5;color:var(--ink-soft);margin:0 0 10px;}
+  .marg-note b{color:var(--accent-ink);font-weight:600;}
+  .marg-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;}
+  @media (max-width:520px){.marg-grid{grid-template-columns:1fr;}}
+  .marg-grid figure{margin:0;min-width:0;}
+  .marg-grid figcaption{font-family:var(--mono);font-size:10.5px;color:var(--ink-soft);margin-bottom:3px;text-align:center;}
+  .mini-svg{width:100%;height:auto;display:block;}
+
+  /* ---------- lattice / heatmap ---------- */
+  .lattice-card{padding:18px;min-width:0;}
+  .lattice-wrap{margin-top:14px;min-width:0;overflow-x:auto;-webkit-overflow-scrolling:touch;}
+  .lattice{
+    display:grid;
+    grid-template-columns:1.6rem repeat(6,minmax(0,1fr)) 1.7rem;
+    gap:4px;align-items:stretch;min-width:0;width:100%;
+  }
+  .lattice-sub{font-size:12.5px;color:var(--ink-soft);margin:6px 0 0;}
+  .lattice-sub b{color:var(--ink);font-weight:600;}
+  .head{
+    font-family:var(--mono);font-size:12px;font-weight:500;color:var(--ink);
+    display:flex;align-items:center;justify-content:center;aspect-ratio:1;
+    min-width:0;overflow:hidden;
+  }
+  .head.corner-lbl{font-size:8.5px;color:var(--ink-faint);}
+  .head.marg-h{font-size:11px;color:var(--accent-ink);}
+  .marg{
+    font-family:var(--mono);font-size:10.5px;color:var(--accent-ink);
+    display:flex;align-items:center;justify-content:center;
+    background:color-mix(in srgb,var(--accent) 8%, white);
+    border:1px dashed color-mix(in srgb,var(--accent) 45%, white);border-radius:6px;aspect-ratio:1;
+  }
+  .marg.col{aspect-ratio:auto;min-height:26px;}
+  .marg.total{background:#f3f4f6;border-style:solid;border-color:var(--line);color:var(--ink-faint);font-weight:600;}
+  .cell{
+    position:relative;aspect-ratio:1;border-radius:6px;border:1px solid var(--line-soft);
+    background:#faf9f6;display:flex;align-items:center;justify-content:center;overflow:hidden;
+    transition:border-color .2s, background .2s;
+  }
+  .cell .pcount{position:absolute;font-family:var(--mono);font-size:10px;z-index:2;color:var(--cell-fg,#bfc2cb);transition:color .2s;}
+  .cell .fill{
+    position:absolute;inset:0;margin:auto;width:0;height:0;border-radius:4px;
+    background:var(--accent);opacity:.9;transition:width .35s ease, height .35s ease;
+  }
+  .cell.support{border-color:color-mix(in srgb,var(--accent) 55%, white);}
+  .cell.support .pcount{color:#fff;font-weight:600;}
+  .cell.flash{animation:flash .6s ease;}
+  @keyframes flash{0%{box-shadow:0 0 0 0 var(--accent);}40%{box-shadow:0 0 0 4px color-mix(in srgb,var(--accent) 40%,transparent);}100%{box-shadow:0 0 0 0 transparent;}}
+  .lattice-legend{display:flex;gap:16px;flex-wrap:wrap;margin-top:14px;font-family:var(--mono);font-size:11px;color:var(--ink-soft);}
+  .lattice-legend span{display:flex;align-items:center;gap:6px;}
+  .lg-swatch{width:13px;height:13px;border-radius:4px;flex:none;}
+
+  /* ---------- lower panels ---------- */
+  .lower{display:grid;grid-template-columns:1fr 1fr;gap:18px;margin-top:18px;}
+  @media (max-width:860px){.lower{grid-template-columns:1fr;}}
+  .sum-card,.exact-card{padding:18px;}
+  svg.sumchart{width:100%;height:auto;display:block;margin-top:8px;font-family:var(--mono);}
+  .sum-legend{display:flex;gap:18px;margin-top:6px;font-family:var(--mono);font-size:11px;color:var(--ink-soft);flex-wrap:wrap;}
+  .sum-legend span{display:flex;align-items:center;gap:7px;}
+
+  /* exact table */
+  .exact-badge{
+    display:inline-flex;align-items:center;gap:8px;font-family:var(--disp);font-weight:600;font-size:13px;
+    padding:7px 12px;border-radius:30px;margin-top:14px;
+  }
+  .exact-badge.good{background:color-mix(in srgb,var(--good) 14%,white);color:#157a51;border:1px solid color-mix(in srgb,var(--good) 45%,white);}
+  .exact-badge.bad{background:color-mix(in srgb,var(--bad) 14%,white);color:#b23e25;border:1px solid color-mix(in srgb,var(--bad) 45%,white);}
+  .exact-badge.neutral{background:#f1f3f6;color:#3f566d;border:1px solid var(--line);}
+  table.exact{width:100%;border-collapse:collapse;margin-top:14px;font-family:var(--mono);font-size:13px;}
+  table.exact td{padding:8px 2px;border-bottom:1px solid var(--line-soft);vertical-align:top;}
+  table.exact tr:last-child td{border-bottom:none;}
+  table.exact td.lbl{color:var(--ink-soft);width:46%;}
+  table.exact td.val{color:var(--ink);text-align:right;font-weight:500;}
+  table.exact td.val small{color:var(--ink-faint);font-weight:400;}
+
+  /* ---------- footer caption ---------- */
+  .caption{
+    margin-top:30px;border-left:3px solid var(--accent);padding:14px 0 14px 18px;
+    color:var(--ink-soft);font-size:14.5px;max-width:78ch;transition:border-color .35s ease;
+  }
+  .caption b{color:var(--ink);font-weight:600;}
+  .colophon{margin-top:22px;font-family:var(--mono);font-size:11px;color:var(--ink-faint);letter-spacing:.02em;}
+  .colophon a{color:var(--ink-soft);}
+
+  @media (prefers-reduced-motion: reduce){
+    .die{transition:none !important;}
+    .cell .fill,.conv-bar i{transition:none !important;}
+    .cell.flash{animation:none;}
+    *{scroll-behavior:auto;}
+  }
+</style>
+</head>
+<body>
+<div class="wrap" id="root" style="--accent:var(--c-independent);--accent-ink:#33485e;">
+
+  <header class="top">
+    <div class="eyebrow">Coupling &amp; optimal transport · two fair dice</div>
+    <h1>Same dice, same odds, <em>three</em> different worlds.</h1>
+    <p class="lede">
+      Watch either die <b>alone</b> and these three set-ups are identical — six faces, each with probability&nbsp;1/6.
+      The difference lives entirely in the <b>joint</b> law: how the two dice agree. Optimal transport asks
+      which joint law makes an expected cost as small as possible.
+    </p>
+  </header>
+
+  <!-- ===== selector ===== -->
+  <div class="selector">
+    <div class="seg" role="tablist" aria-label="Choose a coupling" id="seg"></div>
+  </div>
+
+  <!-- ===== stage: roller + lattice ===== -->
+  <div class="stage">
+
+    <section class="card roller" aria-label="Dice roller">
+      <div class="card-h"><h2>Roll the pair</h2><span class="note" id="roller-rule"></span></div>
+
+      <div class="dice-scene">
+        <div class="die-col">
+          <div class="die" id="dieX" aria-hidden="true"></div>
+          <div class="die-label">die <b>X</b></div>
+        </div>
+        <div class="die-col">
+          <div class="die" id="dieY" aria-hidden="true"></div>
+          <div class="die-label">die <b>Y</b></div>
+        </div>
+      </div>
+
+      <div class="readout" id="readout" aria-live="polite">Press <b>Roll</b> to begin.</div>
+
+      <div class="controls">
+        <button class="btn primary" id="btnRoll">Roll</button>
+        <button class="btn ghost" id="btnAuto">Auto-roll ×1000</button>
+        <button class="btn ghost" id="btnReset" aria-label="Reset empirical counts">Reset</button>
+      </div>
+
+      <div>
+        <div class="card-h" style="padding:6px 0 10px;">
+          <h2>Empirical vs exact</h2>
+          <span class="note" id="ncount">0 rolls</span>
+        </div>
+        <div class="stats" id="stats"></div>
+
+        <div class="marg-toggle-row">
+          <button class="toggle" id="margToggle" role="switch" aria-pressed="false" aria-controls="marginals">
+            <span class="sw" aria-hidden="true"></span>Show each die alone
+          </button>
+          <span class="marg-hint">is X (and Y) still a fair 1/6?</span>
+        </div>
+        <div class="marginals" id="marginals" hidden>
+          <p class="marg-note">Each bar is the empirical P(face). Whatever the coupling does to the <i>joint</i> law, both single-die marginals flatten onto the dashed <b>1/6</b> line — that is what "same fair dice" means.</p>
+          <div class="marg-grid">
+            <figure><figcaption>die X</figcaption><div id="mhx"></div></figure>
+            <figure><figcaption>die Y</figcaption><div id="mhy"></div></figure>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="card lattice-card" aria-label="Joint probability lattice">
+      <div class="card-h">
+        <h2>Joint law on the 6×6 lattice</h2>
+        <span class="note">marginals fixed at 1/6</span>
+      </div>
+      <div class="lattice-wrap">
+        <p class="lattice-sub">Rows = <b>X</b>, columns = <b>Y</b>. Interior cells are the joint law P(X=i, Y=j); the dashed edges are the <b>marginals</b> — always 1/6.</p>
+        <div class="lattice" id="lattice"></div>
+        <div class="lattice-legend">
+          <span><i class="lg-swatch" style="background:var(--accent);"></i> support &amp; theoretical mass</span>
+          <span><i class="lg-swatch" style="border:1px dashed var(--accent);background:color-mix(in srgb,var(--accent) 10%,white);"></i> marginal = 1/6</span>
+          <span>inner square grows toward each cell's empirical frequency</span>
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <!-- ===== lower: sum distribution + exact values ===== -->
+  <div class="lower">
+    <section class="card sum-card" aria-label="Distribution of the sum">
+      <div class="card-h"><h2>Distribution of the sum X + Y</h2><span class="note" id="sum-note"></span></div>
+      <svg class="sumchart" id="sumchart" viewBox="0 0 660 250" role="img" aria-label="Bar chart of the distribution of X plus Y"></svg>
+      <div class="sum-legend">
+        <span><svg width="22" height="12"><rect x="0" y="0" width="22" height="12" rx="2" fill="var(--accent)" opacity="0.28"/></svg> theoretical P(X+Y = s)</span>
+        <span><svg width="22" height="12"><rect x="6" y="0" width="10" height="12" rx="2" fill="var(--accent)"/></svg> empirical, so far</span>
+      </div>
+    </section>
+
+    <section class="card exact-card" aria-label="Exact values">
+      <div class="card-h"><h2 id="exact-title">Exact values</h2><span class="note">closed form</span></div>
+      <div class="exact-badge" id="exact-badge"></div>
+      <table class="exact" id="exact-table"></table>
+    </section>
+  </div>
+
+  <p class="caption" id="caption"></p>
+
+  <p class="colophon">
+    Two fair dice · cost c(x,y) = (x − y)² · Var(X) = 35/12.
+    A static, dependency-free page — <a href="https://en.wikipedia.org/wiki/Coupling_(probability)">coupling</a> meets
+    <a href="https://en.wikipedia.org/wiki/Transportation_theory_(mathematics)">optimal transport</a>.
+  </p>
+</div>
+
+<script>
+"use strict";
+
+/* ============================================================
+   Exact specification of the three couplings.
+   Every closed-form number is verified against the brief's table.
+   ============================================================ */
+const THEORY = {
+  independent:{
+    key:"independent", name:"Independent", formula:"X ⫫ Y", color:"var(--c-independent)", ink:"#33485e",
+    one:"Rolled separately — knowing one die tells you nothing about the other.",
+    rule:"both faces drawn independently",
+    eSq:{frac:"35/6", val:35/6},
+    variance:{frac:"35/12", val:35/12},
+    covariance:{frac:"0", val:0},
+    correlation:{frac:"0", val:0},
+    pDouble:{frac:"1/6", val:1/6},
+    support:"{2, 3, 4, …, 12}",
+    badge:"Baseline — neither best nor worst", badgeKind:"neutral",
+    joint:(i,j)=>1/36,
+    sumPmf:(s)=>(6-Math.abs(s-7))/36,
+    sample:()=>[r6(),r6()],
+  },
+  comonotone:{
+    key:"comonotone", name:"Comonotone", formula:"Y = X", color:"var(--c-comonotone)", ink:"#157a51",
+    one:"Locked together — the dice always land on the same face.",
+    rule:"both dice show the same face",
+    eSq:{frac:"0", val:0},
+    variance:{frac:"35/12", val:35/12},
+    covariance:{frac:"35/12", val:35/12},
+    correlation:{frac:"+1", val:1},
+    pDouble:{frac:"1", val:1},
+    support:"{2, 4, 6, 8, 10, 12}",
+    badge:"Optimal — minimises E[(X−Y)²]", badgeKind:"good",
+    joint:(i,j)=> i===j ? 1/6 : 0,
+    sumPmf:(s)=> (s%2===0 && s>=2 && s<=12) ? 1/6 : 0,
+    sample:()=>{const x=r6();return [x,x];},
+  },
+  antithetic:{
+    key:"antithetic", name:"Antithetic", formula:"Y = 7 − X", color:"var(--c-antithetic)", ink:"#b23e25",
+    one:"Mirror images — the two faces always sum to seven.",
+    rule:"faces always sum to 7",
+    eSq:{frac:"35/3", val:35/3},
+    variance:{frac:"35/12", val:35/12},
+    covariance:{frac:"−35/12", val:-35/12},
+    correlation:{frac:"−1", val:-1},
+    pDouble:{frac:"0", val:0},
+    support:"{7}",
+    badge:"Worst case — maximises E[(X−Y)²]", badgeKind:"bad",
+    joint:(i,j)=> (j === 7-i) ? 1/6 : 0,
+    sumPmf:(s)=> s===7 ? 1 : 0,
+    sample:()=>{const x=r6();return [x,7-x];},
+  },
+};
+const ORDER = ["independent","comonotone","antithetic"];
+const r6 = ()=> 1 + Math.floor(Math.random()*6);
+
+/* ---- pip layouts (3x3 grid positions 0..8) ---- */
+const PIPS = {
+  1:[4], 2:[0,8], 3:[0,4,8], 4:[0,2,6,8], 5:[0,2,4,6,8], 6:[0,2,3,5,6,8]
+};
+/* face values placed on the cube so opposite faces sum to 7 */
+const FACE_VAL = {front:1, back:6, right:2, left:5, top:3, bottom:4};
+/* cube rotation that brings a given value to the front */
+const SHOW = {
+  1:[0,0], 6:[0,180], 2:[0,-90], 5:[0,90], 3:[-90,0], 4:[90,0]
+};
+
+/* ============================================================ state */
+let current = "independent";
+let acc = freshAcc();
+let dieRot = { X:{x:0,y:0}, Y:{x:0,y:0} };
+let busy = false;
+const reduceMotion = (window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches) || false;
+
+function freshAcc(){
+  const sum={}; for(let s=2;s<=12;s++) sum[s]=0;
+  return { n:0, sx:0, sy:0, sxx:0, syy:0, sxy:0, sq:0, doubles:0, sum,
+           joint:Array.from({length:6},()=>Array(6).fill(0)), lastX:null, lastY:null };
+}
+
+/* ============================================================ build dice */
+function faceHTML(val){
+  let cells="";
+  for(let p=0;p<9;p++){
+    cells += `<div class="pip">${PIPS[val].includes(p)?'<span></span>':''}</div>`;
+  }
+  return cells;
+}
+function buildDie(el){
+  el.innerHTML = ["front","back","right","left","top","bottom"].map(f=>
+    `<div class="face f-${f}">${faceHTML(FACE_VAL[f])}</div>`).join("");
+}
+
+/* ============================================================ selector */
+function buildSelector(){
+  const seg = document.getElementById("seg");
+  seg.innerHTML = ORDER.map((k,idx)=>{
+    const t = THEORY[k];
+    return `<button role="tab" data-k="${k}" id="tab-${k}" aria-selected="${k===current}"
+      tabindex="${k===current?0:-1}" style="--tab-c:${t.color};">
+      <span class="tag"><span class="dot"></span>${t.name}</span>
+      <span class="formula">${t.formula}</span>
+      <span class="one-line">${t.one}</span>
+    </button>`;
+  }).join("");
+  seg.querySelectorAll("button").forEach(btn=>{
+    btn.addEventListener("click", ()=> selectCoupling(btn.dataset.k));
+    btn.addEventListener("keydown", (e)=>{
+      const i = ORDER.indexOf(btn.dataset.k);
+      if(e.key==="ArrowRight"||e.key==="ArrowDown"){e.preventDefault();focusTab((i+1)%3);}
+      if(e.key==="ArrowLeft"||e.key==="ArrowUp"){e.preventDefault();focusTab((i+2)%3);}
+    });
+  });
+}
+function focusTab(i){ const k=ORDER[i]; const b=document.getElementById("tab-"+k); b.focus(); selectCoupling(k); }
+
+function selectCoupling(k){
+  if(k===current && acc.n>0){/* still allow reselect to reset? no */}
+  current = k;
+  acc = freshAcc();
+  const t = THEORY[k];
+  const root = document.getElementById("root");
+  root.style.setProperty("--accent", t.color);
+  root.style.setProperty("--accent-ink", t.ink);
+  document.querySelectorAll('#seg button').forEach(b=>{
+    const sel = b.dataset.k===k; b.setAttribute("aria-selected", sel); b.tabIndex = sel?0:-1;
+  });
+  document.getElementById("roller-rule").textContent = t.rule;
+  document.getElementById("readout").innerHTML = `Outcome rule: <b>${t.rule}</b>. Press <b>Roll</b>.`;
+  buildLattice();
+  buildExact();
+  renderStats();
+  renderSum();
+  renderCaption();
+  renderMarginals();
+  document.getElementById("ncount").textContent = "0 rolls";
+}
+
+/* ============================================================ rolling */
+function applyDie(which, val, spin){
+  const el = document.getElementById("die"+which);
+  const [bx,by] = SHOW[val];
+  if(reduceMotion){
+    el.style.transform = `rotateX(${bx}deg) rotateY(${by}deg)`;
+    dieRot[which] = {x:bx,y:by};
+    return;
+  }
+  const next = (cur,base)=>{
+    const minTurns = spin;
+    let target = cur + minTurns*360;
+    const mod = ((base%360)+360)%360;
+    const c = ((target%360)+360)%360;
+    return target + ((mod - c + 360)%360);
+  };
+  const nx = next(dieRot[which].x, bx);
+  const ny = next(dieRot[which].y, by);
+  dieRot[which] = {x:nx,y:ny};
+  el.classList.add("rolling");
+  el.style.transform = `rotateX(${nx}deg) rotateY(${ny}deg)`;
+}
+
+function recordSample(x,y){
+  acc.n++; acc.sx+=x; acc.sy+=y; acc.sxx+=x*x; acc.syy+=y*y; acc.sxy+=x*y;
+  acc.sq += (x-y)*(x-y);
+  if(x===y) acc.doubles++;
+  acc.sum[x+y]++;
+  acc.joint[x-1][y-1]++;
+  acc.lastX=x; acc.lastY=y;
+}
+
+function singleRoll(){
+  if(busy) return;
+  const [x,y] = THEORY[current].sample();
+  recordSample(x,y);
+  const spin = reduceMotion?0:(3+Math.floor(Math.random()*3));
+  applyDie("X", x, spin);
+  applyDie("Y", y, spin+ (Math.random()<.5?1:0));
+  showReadout(x,y);
+  flashCell(x,y);
+  renderStats(); renderLatticeFills(); renderSum(); renderMarginals();
+  document.getElementById("ncount").textContent = acc.n.toLocaleString()+" roll"+(acc.n===1?"":"s");
+}
+
+function autoRoll(n){
+  if(busy) return;
+  busy = true;
+  const t = THEORY[current];
+  for(let k=0;k<n;k++){ const [x,y]=t.sample(); recordSample(x,y); }
+  // settle dice on the final sample with one physical roll
+  const x=acc.lastX, y=acc.lastY;
+  const spin = reduceMotion?0:5;
+  applyDie("X", x, spin); applyDie("Y", y, spin);
+  showReadout(x,y); flashCell(x,y);
+  renderStats(); renderLatticeFills(); renderSum(); renderMarginals();
+  document.getElementById("ncount").textContent = acc.n.toLocaleString()+" rolls";
+  setTimeout(()=>{ busy=false; }, reduceMotion?0:300);
+}
+
+function showReadout(x,y){
+  const dbl = x===y;
+  document.getElementById("readout").innerHTML =
+    `X = <b>${x}</b> &nbsp; Y = <b>${y}</b> &nbsp;·&nbsp; (X−Y)² = <b>${(x-y)*(x-y)}</b>
+     &nbsp; sum = <b>${x+y}</b>
+     <span class="chip ${dbl?'yes':'no'}">${dbl?'double':'no double'}</span>`;
+}
+
+/* ============================================================ lattice */
+function buildLattice(){
+  const t = THEORY[current];
+  const L = document.getElementById("lattice");
+  let html = "";
+  // header row (8 cells): corner label, Y values 1..6, row-sum header
+  html += `<div class="head corner-lbl">X∖Y</div>`;
+  for(let j=1;j<=6;j++) html += `<div class="head">${j}</div>`;
+  html += `<div class="head marg-h">Σⱼ</div>`;
+
+  // 6 data rows
+  for(let i=1;i<=6;i++){
+    html += `<div class="head">${i}</div>`;
+    for(let j=1;j<=6;j++){
+      const p = t.joint(i,j);
+      const sup = p>0;
+      const label = p===0 ? "0" : (p===1/6 ? "⅙" : "1/36");
+      html += `<div class="cell ${sup?'support':''}" data-i="${i}" data-j="${j}" style="${sup?`background:color-mix(in srgb,var(--accent) ${Math.min(80, p*220)}% ,white);`:''}">
+        <span class="fill"></span><span class="pcount">${label}</span></div>`;
+    }
+    html += `<div class="marg">⅙</div>`;
+  }
+  // footer marginal row (8 cells): col-sum header, P(Y=j) marginals, total
+  html += `<div class="head marg-h">Σᵢ</div>`;
+  for(let j=1;j<=6;j++) html += `<div class="marg col">⅙</div>`;
+  html += `<div class="marg total">1</div>`;
+
+  L.innerHTML = html;
+  renderLatticeFills();
+}
+
+function renderLatticeFills(){
+  const t = THEORY[current];
+  document.querySelectorAll("#lattice .cell").forEach(c=>{
+    const i=+c.dataset.i, j=+c.dataset.j;
+    const hits = acc.joint[i-1][j-1];
+    const freq = acc.n? hits/acc.n : 0;
+    // scale inner square: full cell == max theoretical mass on support, so support cells fill to ~100% at convergence
+    const ref = t.key==="independent" ? 1/36 : 1/6;
+    const scale = Math.min(1, freq/ref);
+    const fill = c.querySelector(".fill");
+    const pct = Math.round(scale*86);
+    fill.style.width = pct+"%"; fill.style.height = pct+"%";
+    // non-support cells: tiny grey fill to show stray empirical mass (should vanish)
+    if(t.joint(i,j)===0 && freq>0){
+      fill.style.background = "var(--ink-faint)"; fill.style.opacity=".5";
+    }
+  });
+}
+function flashCell(x,y){
+  const c = document.querySelector(`#lattice .cell[data-i="${x}"][data-j="${y}"]`);
+  if(!c) return;
+  c.classList.remove("flash"); void c.offsetWidth; c.classList.add("flash");
+}
+
+/* ============================================================ marginal fairness */
+function marginalsXY(){
+  const n=acc.n; const X=[0,0,0,0,0,0], Y=[0,0,0,0,0,0];
+  for(let i=0;i<6;i++) for(let j=0;j<6;j++){ const c=acc.joint[i][j]; X[i]+=c; Y[j]+=c; }
+  return {X,Y,n};
+}
+function miniHist(counts,n,label){
+  const W=300,H=140,padL=28,padR=8,padT=12,padB=22;
+  const plotW=W-padL-padR, plotH=H-padT-padB, yMax=0.30;
+  const yOf=v=>padT+plotH*(1-Math.min(v,yMax)/yMax);
+  const bw=plotW/6;
+  let g="";
+  [0,0.1,0.2,0.3].forEach(v=>{
+    const y=yOf(v);
+    g+=`<line x1="${padL}" y1="${y}" x2="${W-padR}" y2="${y}" stroke="var(--line-soft)" stroke-width="1"/>`;
+    g+=`<text x="${padL-5}" y="${y+3}" text-anchor="end" font-size="8.5" fill="var(--ink-faint)">${v.toFixed(1)}</text>`;
+  });
+  for(let f=0;f<6;f++){
+    const freq=n?counts[f]/n:0, cx=padL+f*bw+bw/2, w=bw*0.58;
+    if(freq>0){
+      const h=plotH*Math.min(freq,yMax)/yMax;
+      g+=`<rect x="${cx-w/2}" y="${yOf(freq)}" width="${w}" height="${h}" rx="2" fill="var(--accent)" opacity="0.85"/>`;
+    }
+    g+=`<text x="${cx}" y="${H-padB+13}" text-anchor="middle" font-size="9" fill="var(--ink-soft)">${f+1}</text>`;
+  }
+  const yr=yOf(1/6);
+  g+=`<line x1="${padL}" y1="${yr}" x2="${W-padR}" y2="${yr}" stroke="var(--ink)" stroke-width="1.1" stroke-dasharray="4 3" opacity="0.6"/>`;
+  g+=`<text x="${W-padR}" y="${yr-3}" text-anchor="end" font-size="8.5" fill="var(--ink-soft)">1/6</text>`;
+  g+=`<line x1="${padL}" y1="${yOf(0)}" x2="${W-padR}" y2="${yOf(0)}" stroke="var(--line)" stroke-width="1.5"/>`;
+  return `<svg viewBox="0 0 ${W} ${H}" class="mini-svg" role="img" aria-label="${label} face frequencies"><title>${label} face frequencies</title>${g}</svg>`;
+}
+function renderMarginals(){
+  const wrap=document.getElementById("marginals");
+  if(!wrap || wrap.hidden) return;
+  const {X,Y,n}=marginalsXY();
+  document.getElementById("mhx").innerHTML = miniHist(X,n,"die X");
+  document.getElementById("mhy").innerHTML = miniHist(Y,n,"die Y");
+}
+
+/* ============================================================ stats */
+function fmt(v,dp){ if(v==null||Number.isNaN(v)) return "—"; return v.toFixed(dp); }
+function empStats(){
+  const n=acc.n;
+  const eSq = n? acc.sq/n : NaN;
+  const pD  = n? acc.doubles/n : NaN;
+  const numr = n*acc.sxy - acc.sx*acc.sy;
+  const den  = Math.sqrt((n*acc.sxx - acc.sx*acc.sx)*(n*acc.syy - acc.sy*acc.sy));
+  const corr = (n>1 && den>1e-9)? numr/den : NaN;
+  return {eSq,pD,corr};
+}
+function renderStats(){
+  const t = THEORY[current];
+  const e = empStats();
+  const has = acc.n>0;
+  const conv = (emp,exact,scale)=>{
+    if(Number.isNaN(emp)) return 0;
+    const err = Math.abs(emp-exact);
+    return Math.max(0, Math.min(1, 1 - err/scale));
+  };
+  const cards = [
+    {k:"E[(X−Y)²]  · transport cost", emp:fmt(e.eSq,3), exf:t.eSq.frac, exv:fmt(t.eSq.val,3), conv:conv(e.eSq,t.eSq.val,12)},
+    {k:"Correlation  ρ(X,Y)", emp:fmt(e.corr,3), exf:t.correlation.frac, exv:fmt(t.correlation.val,3), conv:conv(e.corr,t.correlation.val,2)},
+    {k:"P(double)  = P(X=Y)", emp:fmt(e.pD,3), exf:t.pDouble.frac, exv:fmt(t.pDouble.val,3), conv:conv(e.pD,t.pDouble.val,1)},
+  ];
+  document.getElementById("stats").innerHTML = cards.map(c=>`
+    <div class="stat">
+      <span class="k">${c.k}</span>
+      <div class="row">
+        <span class="emp ${has?'':'dim'}">${has?c.emp:'·'}</span>
+        <span class="exact">${c.exf}<small>exact ${c.exv}</small></span>
+      </div>
+      <div class="conv-bar"><i style="width:${has?Math.round(c.conv*100):0}%"></i></div>
+    </div>`).join("");
+}
+
+/* ============================================================ sum chart */
+function renderSum(){
+  const t = THEORY[current];
+  const svg = document.getElementById("sumchart");
+  const W=660,H=250, padL=42, padR=14, padT=14, padB=34;
+  const sums=[]; for(let s=2;s<=12;s++) sums.push(s);
+  const theo = sums.map(s=>t.sumPmf(s));
+  const emp  = sums.map(s=> acc.n? acc.sum[s]/acc.n : 0);
+  const yMax = Math.max(0.01, ...theo, ...emp) * 1.12;
+  const plotW = W-padL-padR, plotH = H-padT-padB;
+  const bw = plotW/sums.length;
+  const yOf = v => padT + plotH*(1 - v/yMax);
+  const xOf = i => padL + i*bw;
+
+  let g = "";
+  // y gridlines
+  const ticks=4;
+  for(let k=0;k<=ticks;k++){
+    const v = yMax*k/ticks; const y=yOf(v);
+    g += `<line x1="${padL}" y1="${y}" x2="${W-padR}" y2="${y}" stroke="var(--line-soft)" stroke-width="1"/>`;
+    g += `<text x="${padL-6}" y="${y+3}" text-anchor="end" font-size="9" fill="var(--ink-faint)">${v.toFixed(2)}</text>`;
+  }
+  // bars
+  sums.forEach((s,i)=>{
+    const cx = xOf(i)+bw/2;
+    const tw = bw*0.66, ew = bw*0.30;
+    // theoretical (wide translucent)
+    if(theo[i]>0){
+      const h = plotH*(theo[i]/yMax);
+      g += `<rect x="${cx-tw/2}" y="${yOf(theo[i])}" width="${tw}" height="${h}" rx="2.5"
+             fill="var(--accent)" opacity="0.26"/>`;
+    }
+    // empirical (narrow solid)
+    if(emp[i]>0){
+      const h = plotH*(emp[i]/yMax);
+      g += `<rect x="${cx-ew/2}" y="${yOf(emp[i])}" width="${ew}" height="${h}" rx="2"
+             fill="var(--accent)"/>`;
+    }
+    g += `<text x="${cx}" y="${H-padB+15}" text-anchor="middle" font-size="10" fill="var(--ink-soft)">${s}</text>`;
+  });
+  // axis baseline
+  g += `<line x1="${padL}" y1="${yOf(0)}" x2="${W-padR}" y2="${yOf(0)}" stroke="var(--line)" stroke-width="1.5"/>`;
+  g += `<text x="${padL}" y="${H-4}" font-size="9.5" fill="var(--ink-faint)">sum s = X + Y</text>`;
+  svg.innerHTML = g;
+  document.getElementById("sum-note").textContent =
+    current==="comonotone" ? "evens only" : current==="antithetic" ? "always 7" : "classic triangle";
+}
+
+/* ============================================================ exact panel */
+function buildExact(){
+  const t = THEORY[current];
+  document.getElementById("exact-title").textContent = `Exact values — ${t.name}`;
+  const badge = document.getElementById("exact-badge");
+  badge.className = "exact-badge "+t.badgeKind;
+  badge.textContent = t.badge;
+  const rows = [
+    ["E[(X − Y)²]  (cost)", t.eSq.frac, t.eSq.val],
+    ["Var(X) = Var(Y)", t.variance.frac, t.variance.val],
+    ["Cov(X, Y)", t.covariance.frac, t.covariance.val],
+    ["Correlation ρ", t.correlation.frac, t.correlation.val],
+    ["P(double)", t.pDouble.frac, t.pDouble.val],
+    ["Support of X + Y", t.support, null],
+  ];
+  document.getElementById("exact-table").innerHTML = rows.map(([l,f,v])=>{
+    const dec = v==null ? "" : `<small> · ${Number.isInteger(v)?v:v.toFixed(3)}</small>`;
+    return `<tr><td class="lbl">${l}</td><td class="val">${f}${dec}</td></tr>`;
+  }).join("");
+}
+
+/* ============================================================ caption */
+function renderCaption(){
+  const t = THEORY[current];
+  const msg = {
+    independent:`Right now the dice are <b>independent</b>: the interior of the lattice is uniform, every cell 1/36. The cost sits at the baseline <b>35/6 ≈ 5.83</b>. Notice the edge marginals — both still a flat 1/6.`,
+    comonotone:`This is the <b>optimal</b> coupling for squared cost. All mass lies on the diagonal, so X and Y are equal, every roll is a double, and the cost drops to <b>0</b>. No coupling of two fair dice can do better.`,
+    antithetic:`This is the <b>worst</b> coupling for squared cost. Mass lies on the anti-diagonal, the dice always sum to 7, and the cost climbs to its maximum <b>35/3 ≈ 11.67</b>.`,
+  }[t.key];
+  document.getElementById("caption").innerHTML =
+    `${msg} Across all three columns the <b>marginals are identical</b> — that is the whole point. Optimal transport is the study of <b>which coupling minimises a chosen expected cost</b>; here the monotone (comonotone) coupling wins.`;
+}
+
+/* ============================================================ init */
+function init(){
+  buildDie(document.getElementById("dieX"));
+  buildDie(document.getElementById("dieY"));
+  applyDie("X",1,0); applyDie("Y",1,0);
+  buildSelector();
+  selectCoupling("independent");
+  document.getElementById("btnRoll").addEventListener("click", singleRoll);
+  document.getElementById("btnAuto").addEventListener("click", ()=>{
+    const b=document.getElementById("btnAuto"); b.disabled=true; b.textContent="Rolling…";
+    setTimeout(()=>{ autoRoll(1000); b.disabled=false; b.textContent="Auto-roll ×1000"; }, 20);
+  });
+  document.getElementById("btnReset").addEventListener("click", ()=>{
+    acc = freshAcc();
+    document.getElementById("ncount").textContent = "0 rolls";
+    document.getElementById("readout").innerHTML = `Outcome rule: <b>${THEORY[current].rule}</b>. Press <b>Roll</b>.`;
+    renderStats(); renderLatticeFills(); renderSum(); renderMarginals();
+  });
+  // keyboard: space/enter on body rolls
+  document.addEventListener("keydown",(e)=>{
+    if(e.target.tagName==="BUTTON") return;
+    if(e.code==="Space"){ e.preventDefault(); singleRoll(); }
+  });
+  // marginal-fairness toggle
+  const mt=document.getElementById("margToggle");
+  mt.addEventListener("click", ()=>{
+    const next = mt.getAttribute("aria-pressed")!=="true";
+    mt.setAttribute("aria-pressed", String(next));
+    document.getElementById("marginals").hidden = !next;
+    renderMarginals();
+  });
+}
+document.addEventListener("DOMContentLoaded", init);
+</script>
+</body>
+</html>
